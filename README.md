@@ -1,114 +1,372 @@
-🏦 Credit Risk Default Prediction with Explainable AI
+# 🏦 Credit Risk Default Prediction with Explainable AI
 
-📖 Overview
+## 📖 Overview
 
-When a bank gives out a loan, they take a risk. If the borrower doesn't pay it back (a "default"), the bank loses money. But if the bank is too strict and denies everyone, they make no money.
+When a bank gives out a loan, it takes on financial risk. If the borrower doesn't repay the loan, the bank loses money. However, if the bank is too strict and rejects too many applicants, it loses potential business.
 
-This project solves that problem by using Machine Learning to predict the exact probability that a borrower will default before the bank gives them the money. Furthermore, if a loan is denied, federal law requires the bank to explain why. So, this project doesn't just predict risk—it also generates a visual explanation for every single decision using SHAP.
+This project uses **Machine Learning to predict the probability of loan default before a loan is approved**.
 
-\---
+Beyond prediction, the project also focuses on **Explainable AI (XAI)** using **SHAP**, allowing the model's predictions to be interpreted at both the global and individual applicant levels.
 
-📊 The Dataset
+---
 
-I used the Lending Club Loan Data dataset, which contains real-world loan applications, borrower credit histories, and final loan outcomes (Fully Paid vs. Charged Off). The raw dataset contains 151 columns of mixed data types (numbers, dates, and text categories).
+## 📊 Dataset
 
-\---
+I used the **Lending Club Loan Data** dataset, which contains real-world loan applications, borrower credit histories, and final loan outcomes such as:
 
-🛠️ Step-by-Step Breakdown
+* `Fully Paid`
+* `Charged Off`
 
-Here is exactly how I built this pipeline from scratch, explained simply:
+The raw dataset contains approximately **151 columns** with mixed data types, including:
 
-Step 1: Data Cleaning & Removing Empty Columns
+* Numerical features
+* Dates
+* Categorical variables
+* Text-based fields
+* Missing values
 
-Machine Learning models cannot understand empty data. The raw dataset had 151 columns, many of which were completely empty or contained mostly missing values. I wrote code to automatically find and drop any column that was 100% null, cleaning up the dataset and making it easier to read.
+---
 
-Step 2: Stopping the "Time Traveler" Problem (Data Leakage)
+# 🛠️ Step-by-Step Breakdown
 
-In real life, you don't know if someone will default until after you give them the loan. However, the raw dataset included features that only happen after a loan is issued—like "total late fees paid" or "last payment amount."
+## Step 1: Data Cleaning & Removing Empty Columns
 
-If I trained the model on these features, the model would "cheat" by looking into the future. This is called Data Leakage, and it is the #1 reason ML models fail in production. I carefully identified and dropped 20+ of these post-origination columns to ensure the model only uses information available at the moment of application.
+Machine Learning models cannot directly handle completely empty features.
 
-Step 3: Feature Engineering (Text to Numbers)
+The raw dataset contained many columns that were either completely empty or had a very high percentage of missing values.
 
-ML models only understand numbers, not text or calendar dates.
+I wrote a preprocessing pipeline that automatically identifies and removes columns that are **100% null**, reducing unnecessary features and simplifying the dataset.
 
-• I converted dates like earliestcrline into a number: "Years of Credit History."
+---
 
-• I cleaned strings like " 36 months" into the number 36.
+## Step 2: Preventing Data Leakage
 
-• For text categories like Grade (A, B, C) and Purpose (debt consolidation, credit card), I used LightGBM's Native Categorical Support. Instead of creating dozens of new columns (One-Hot Encoding), LightGBM can natively learn from text categories if we format them correctly, saving memory and improving accuracy.
+One of the most important parts of the project was preventing **data leakage**.
 
-Step 4: Chronological Train/Test Split
+In a real loan application, the model can only use information available **at the time the loan is issued**.
 
-Normally, data scientists split their data randomly. In finance, this is a crime! If you train on loans from 2018 to predict loans from 2015, you are using future information to predict the past.
+However, the original dataset contained features that were generated **after loan origination**, such as:
 
-Instead, I sorted the data by issued (the date the loan was issued). I trained the model on older loans (the past) and tested it on newer loans (the future) to simulate real-world banking conditions.
+* Total late fees paid
+* Last payment amount
+* Subsequent payment information
+* Other post-origination variables
 
-Step 5: Training LightGBM & Handling Imbalance
+Using these features would allow the model to indirectly "look into the future."
 
-In the real world, most people pay back their loans. Only about 19% actually default. If I just threw the data into a model, it would just guess "Good Loan" every time and be 81% accurate without actually learning anything.
+This would produce artificially high performance and make the model unsuitable for real-world deployment.
 
-I used LightGBM (a powerful tree-based algorithm) and implemented a technique called scaleposweight. This forced the model to pay extra attention to the rare default cases. I also used Early Stopping, which tells the model to stop training the moment it starts memorizing the data (overfitting).
+I therefore identified and removed **20+ post-origination features** to ensure that the model only uses information that would realistically be available when making the lending decision.
 
-Step 6: Fixing the Probabilities (Calibration)
+---
 
-Because I forced the model to care about defaults, the model got scared and started predicting 40%+ default rates for everyone! The model's ranking was correct (it knew who was risky), but its probabilities were wrong.
+## Step 3: Feature Engineering
 
-If a bank prices a loan based on a fake 40% risk, they will overcharge the customer and lose the deal. I fixed this using Isotonic Regression Calibration. I trained a secondary mathematical model that "squished" the inflated 43% predictions back down to match the real-world 19% default rate. Now, if the model says "10% chance of default," you can literally trust that number.
+Machine Learning models require numerical and structured inputs, so several raw features needed to be transformed.
 
-Step 7: Explainable AI (SHAP)
+### Date Features
 
-Banks cannot use "black box" models. If a loan is denied, federal law requires the bank to send the customer a letter explaining exactly why.
+For example, instead of directly using `earliest_cr_line`, I converted it into a more meaningful feature:
 
-I used a library called SHAP (SHapley Additive exPlanations). SHAP uses game theory to break down a single prediction and tell you exactly how much each feature contributed. For example: "The model predicted a 30% default risk because their Debt-to-Income ratio pushed the risk up by 10%, and their recent credit inquiries pushed it up by 8%." I generated global feature importance bars and local "Waterfall" charts for individual applicants.
+> **Years of Credit History**
 
-Step 8: Deployment with Streamlit
+### String Features
 
-Code in a Jupyter Notebook is great, but it isn't a product. I built an interactive web application using Streamlit.
+Values such as:
 
-• Users can slide bars to input an applicant's Income, Loan Amount, Interest Rate, and Credit Grade.
+```text
+36 months
+60 months
+```
 
-• The app instantly calculates the Probability of Default using the calibrated model.
+were converted into numerical values:
 
-• The app renders a live SHAP Waterfall chart explaining exactly why the model made that decision.
+```text
+36
+60
+```
 
-\---
+### Categorical Features
 
-📈 Results & Metrics
+Features such as:
 
-Because the data is imbalanced (only 19% defaults), plain "Accuracy" is a terrible metric. I evaluated the model using credit industry standards:
+* `Grade`
+* `Purpose`
+* Other categorical variables
 
-• KS-Statistic (0.36): The Kolmogorov-Smirnov test measures the maximum separation between Good and Bad loans. >0.30 is considered a strong model in finance.
+were converted into categorical data types.
 
-• PR-AUC (0.45): Precision-Recall Area Under Curve measures how well the model identifies the minority (default) class.
+I used **LightGBM's native categorical feature support** instead of manually applying one-hot encoding to every categorical variable.
 
-\---
+This reduces unnecessary dimensionality while allowing LightGBM to learn relationships between categorical values.
 
-💻 Tech Stack
+---
 
-• Language: Python
+## Step 4: Chronological Train/Test Split
 
-• Data Manipulation: Pandas, NumPy
+Instead of using a completely random train/test split, I used a **chronological split** based on the loan issue date.
 
-• Machine Learning: LightGBM, Scikit-Learn
+The data was first sorted by:
 
-• Explainability: SHAP
+```text
+issue_d
+```
 
-• Visualization: Matplotlib
+The model was then trained on **older loans** and evaluated on **newer loans**.
 
-• Deployment: Streamlit
+This better simulates a real-world scenario:
 
+```text
+Past Data → Model Training → Future Data → Model Testing
+```
 
-🚀 How to Run the AppLocally
+This approach helps prevent information from future periods from influencing model training and provides a more realistic estimate of how the model may perform after deployment.
 
-1.Clone this repository.
+---
 
-2.Install the required packages:
+## Step 5: Training LightGBM & Handling Class Imbalance
 
-pip install streamlit lightgbm shap scikit-learn pandasnumpy
+Loan default is an imbalanced classification problem.
 
-3.Run the app:
+Approximately:
 
+* **81%** of loans were non-defaults
+* **19%** of loans were defaults
+
+If a model simply predicted every loan as "non-default," it could achieve around 81% accuracy without actually identifying risky borrowers effectively.
+
+To address this, I used **LightGBM** with:
+
+```python
+scale_pos_weight
+```
+
+This assigns greater importance to the minority default class during training.
+
+I also used **Early Stopping** to prevent unnecessary training once validation performance stopped improving, helping reduce overfitting.
+
+---
+
+## Step 6: Probability Calibration
+
+The class weighting improved the model's ability to identify risky borrowers, but it also affected the raw probability estimates.
+
+For example, the model could become overly conservative and produce inflated default probabilities such as:
+
+```text
+43%
+40%
+38%
+```
+
+even when the actual observed default rate was much lower.
+
+This creates a problem because in credit risk, the **probability itself matters**, not just the ranking of borrowers.
+
+I therefore used **Isotonic Regression Calibration**.
+
+The calibration process maps the model's raw predictions to probabilities that better correspond to observed outcomes.
+
+For example:
+
+```text
+Raw Model Probability
+        ↓
+Isotonic Regression
+        ↓
+Calibrated Probability
+```
+
+The goal is that when the model predicts a **10% probability of default**, approximately 10% of similar borrowers should actually default over the relevant outcome period.
+
+---
+
+# 🔍 Step 7: Explainable AI with SHAP
+
+A major component of this project is **Explainable AI**.
+
+I used **SHAP (SHapley Additive exPlanations)** to understand how individual features influence model predictions.
+
+SHAP is based on concepts from **game theory** and assigns contribution values to individual features.
+
+For example, an individual prediction could be explained conceptually as:
+
+```text
+Predicted Default Risk: 30%
+
+Debt-to-Income Ratio       → Increased risk
+Recent Credit Inquiries    → Increased risk
+Strong Credit Grade       → Reduced risk
+Long Credit History       → Reduced risk
+```
+
+I generated both:
+
+### Global Explanations
+
+These show which features are generally the most important across the entire dataset.
+
+### Local Explanations
+
+These explain why the model produced a particular prediction for an individual applicant.
+
+I used **SHAP Waterfall plots** to visualize these individual contributions.
+
+---
+
+# 🚀 Step 8: Deployment with Streamlit
+
+A Jupyter Notebook is useful for experimentation, but the final model should be accessible through an application.
+
+I built an interactive **Streamlit web application**.
+
+Users can enter or adjust applicant information such as:
+
+* Income
+* Loan Amount
+* Interest Rate
+* Credit Grade
+
+The application then:
+
+1. Processes the applicant's inputs
+2. Generates the model prediction
+3. Applies probability calibration
+4. Displays the predicted probability of default
+5. Generates a SHAP explanation
+6. Displays a SHAP Waterfall chart
+
+### Application Flow
+
+```text
+User Input
+    ↓
+Feature Preprocessing
+    ↓
+LightGBM Model
+    ↓
+Raw Default Probability
+    ↓
+Probability Calibration
+    ↓
+Final Default Probability
+    ↓
+SHAP Explanation
+    ↓
+Streamlit Dashboard
+```
+
+---
+
+# 📈 Results & Evaluation
+
+Because the dataset is imbalanced, **accuracy alone is not an appropriate evaluation metric**.
+
+I therefore evaluated the model using metrics more relevant to imbalanced credit-risk classification.
+
+### KS Statistic
+
+**KS Statistic: 0.36**
+
+The **Kolmogorov-Smirnov (KS) statistic** measures the maximum separation between the score distributions of defaulted and non-defaulted borrowers.
+
+A higher KS generally indicates better separation between the two groups.
+
+### PR-AUC
+
+**PR-AUC: 0.45**
+
+The **Precision-Recall Area Under the Curve (PR-AUC)** is particularly useful for evaluating performance on the minority class.
+
+It measures the model's ability to identify default cases while considering the trade-off between precision and recall.
+
+---
+
+# 💻 Tech Stack
+
+| Category             | Technology             |
+| -------------------- | ---------------------- |
+| Programming Language | Python                 |
+| Data Manipulation    | Pandas, NumPy          |
+| Machine Learning     | LightGBM, Scikit-Learn |
+| Explainable AI       | SHAP                   |
+| Visualization        | Matplotlib             |
+| Deployment           | Streamlit              |
+
+---
+
+# 📂 Project Pipeline
+
+```text
+Raw Lending Club Dataset
+          ↓
+Data Cleaning
+          ↓
+Remove Empty / High-Missing Features
+          ↓
+Remove Post-Origination Features
+          ↓
+Feature Engineering
+          ↓
+Categorical Feature Processing
+          ↓
+Chronological Train/Test Split
+          ↓
+LightGBM Model
+          ↓
+Class Imbalance Handling
+          ↓
+Probability Calibration
+          ↓
+SHAP Explainability
+          ↓
+Streamlit Deployment
+```
+
+---
+
+# 🚀 How to Run the App Locally
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/Shahidd7/credit-risk-prediction
+cd https://github.com/Shahidd7/credit-risk-prediction
+```
+
+## 2. Install Dependencies
+
+```bash
+pip install streamlit lightgbm shap scikit-learn pandas numpy matplotlib
+```
+
+## 3. Run the Streamlit Application
+
+```bash
 streamlit run app.py
+```
 
-4.Open your browser to http://localhost:8501
+## 4. Open the Application
+
+After running the command, open:
+
+```text
+http://localhost:8501
+```
+
+---
+
+# 🎯 Key Highlights
+
+* Built an end-to-end **credit risk prediction pipeline**
+* Worked with a real-world Lending Club dataset
+* Removed **data leakage** from post-origination features
+* Performed feature engineering on dates, strings, and categorical variables
+* Used **LightGBM** for classification
+* Addressed class imbalance using `scale_pos_weight`
+* Used **chronological validation** to simulate future predictions
+* Calibrated predicted probabilities using **Isotonic Regression**
+* Implemented **SHAP-based explainability**
+* Created global and individual prediction explanations
+* Deployed the model using **Streamlit**
+* Evaluated performance using **KS Statistic and PR-AUC**
