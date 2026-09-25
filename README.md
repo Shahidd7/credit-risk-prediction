@@ -16,7 +16,9 @@ I used the **Lending Club Loan Data** dataset, which contains real-world loan ap
 
 * `Fully Paid`
 * `Charged Off`
+
 Link - https://www.kaggle.com/datasets/wordsforthewise/lending-club
+
 The raw dataset contains approximately **151 columns** with mixed data types, including:
 
 * Numerical features
